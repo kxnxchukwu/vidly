@@ -1,13 +1,14 @@
 import React, { Component } from "react";
 import MoviesTable from "./MoviesTable";
-import { getMovies } from "../services/fakeMovieService";
+import { getMovies, deleteMovie } from "../services/movieService";
 import Pagination from "./common/pagination";
 import { paginate } from "../utils/paginate";
 import Sidebar from "./common/sidebar";
-import { getGenres } from "../services/fakeGenreService";
+import { getGenres } from "../services/genreService";
 import _ from "lodash";
 import Link from "react-router-dom/Link";
 import SearchBox from './common/searchBox';
+import { toast } from 'react-toastify';
 
 class Movie extends Component {
   state = {
@@ -20,14 +21,26 @@ class Movie extends Component {
     sortColumn: { path: "title", order: "asc" }
   };
 
-  componentDidMount() {
-    const genres = [{ name: "All Movies", _id: "" }, ...getGenres()];
-    this.setState({ movies: getMovies(), genres });
+  async componentDidMount() {
+    const {data} = await getGenres();
+    const genres = [{ name: "All Movies", _id: "" }, ...data];
+    const {data: movies} = await getMovies();
+    this.setState({ movies, genres });
   }
 
-  handleDelete = movie => {
-    const movies = this.state.movies.filter(m => m._id !== movie._id);
+  handleDelete = async movie => {
+    const originalMovies = this.state.movies;
+    const movies = originalMovies.filter(m => m._id !== movie._id);
     this.setState({ movies });
+
+    try {
+      await deleteMovie(movie._id);
+      }
+      catch (ex) {
+      if (ex.response && ex.response.status === 404)
+      toast.error('Movie not found');
+      this.setState({ movies: originalMovies })
+      }
   };
 
   handleLike = movie => {
@@ -80,6 +93,7 @@ class Movie extends Component {
   render() {
     const { length: count } = this.state.movies;
     const { currentPage, pageSize, sortColumn } = this.state;
+    const user = this.props;
 
     if (count === 0) {
       return (
@@ -102,7 +116,7 @@ class Movie extends Component {
             />
           </div>
           <div className="col-10">
-            <Link to="/movies/new" className="btn btn-primary">New Movie</Link>
+            {!user && (<Link to="/movies/new" className="btn btn-primary">New Movie</Link>)}
             <p className="text-success lead mt-3">
               Now Showing {totalCount} Movies in the database
             </p>
